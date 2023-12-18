@@ -1,0 +1,83 @@
+---
+title: "Penultimate syllable duration and final vowel deletion"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(emmeans)
+library (lme4)
+library(lmerTest)
+library(pbkrtest)
+library(afex)
+library(car) 
+library(ggplot2)
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir='/Users/marcofonseca/Library/Mobile Documents/com~apple~CloudDocs/congressos/labphon/2024/amana')
+```
+Reading data and changing data to factors.  
+```{r}
+
+tier2.apagamento<-read.csv("tier2apagamento.csv")
+tier2.apagamento$u <-as.factor(tier2.apagamento$u)
+tier2.apagamento$group <-as.factor(tier2.apagamento$group)
+
+
+```
+Bulding model. We tried several combinations of interactions and random effects and this was the only one that converged. 
+```{r}
+model<-lmer(duration ~ group + u +(1|sessionID) + (1|word) + (1|speakerID) ,data<-tier2.apagamento)
+```
+
+Checking assumptions. 
+```{r}
+residuals <- resid(model)
+#Assumption: linearity of the data
+plot(model)
+#passed because there's a straight lne 
+
+#Assumption: normal distrbution of errors
+#passsed because it the histogram has a bell-like shape 
+hist(residuals)
+
+#Assumption: autocorrelation ok
+#https://stackoverflow.com/questions/40216373/how-to-interpret-acf-plot-y-axis-scale-in-r
+#We ague that it passed because there are no spikes
+
+autocorrelation <- acf(resid(model), lag.max=20, plot=FALSE)
+plot(autocorrelation,
+     main="Autocorrelation",
+     xlab="Lag Parameter",
+     ylab="ACF")
+#(independent errors)
+
+#Assumption: homoscedasticity
+#We argued it passed because the boxplots indicate a homogenous distribution of the residuals.
+boxplot(residuals(model) ~ tier2.apagamento$group )
+```
+Checking p-values of the model and plotting duration data. 
+
+```{r}
+mixed(model,tier2.apagamento)
+emmeans(model,list(pairwise ~ group + u))
+
+#changing names so it's easier to understand the boxplot
+tier2.apagamento<-read.csv("tier2apagamento.csv")
+tier2.apagamento$u[tier2.apagamento$u == "com_u"] <- "not deleted"
+tier2.apagamento$u[tier2.apagamento$u == "sem_u"] <- "deleted"
+
+ggplot(tier2.apagamento) +
+  geom_boxplot(aes(x=u, y=duration, color = u))+
+  xlab("Deletion")+
+  ylab("Duration (m.s.)")+
+   ggtitle("Penultimate syllable duration")+
+  scale_color_brewer(name = "Final [u]", palette="Dark2") 
+  
+
+
+```
+
